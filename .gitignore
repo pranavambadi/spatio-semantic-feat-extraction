@@ -1,0 +1,9 @@
+results/
+*.pkl
+*.csv
+__pycache__/
+*.pyc
+WRAP/
+Nathalie_cookie_theft/
+*.cha
+*.rtf

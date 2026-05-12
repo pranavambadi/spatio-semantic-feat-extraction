@@ -1,0 +1,10 @@
+regex
+spacy
+pandas
+numpy
+networkx
+matplotlib
+scipy
+scikit-learn
+tqdm
+striprtf
