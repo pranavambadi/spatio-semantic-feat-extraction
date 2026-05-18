@@ -20,7 +20,7 @@ Usage
 -----
 1. Point `datasets` at your transcript directory.
 2. Point `results_dir` at a (writable) directory for intermediate .pkl files.
-3. Run:  python extract_feat_ICASSP.py
+3. Run:  python extract_feat.py
 
 Output
 ------
@@ -33,7 +33,7 @@ import os
 import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
-from utilsICASSP import *
+from utils import *
 
 
 # datasets = './Nathalie_cookie_theft'   # RTF transcripts
@@ -49,6 +49,6 @@ all_df = extract_spatio_semantics(all_df, results_dir)
 spatial_semantics = summarize_spatio_semantics(dir=results_dir)
 all_df = all_df.merge(spatial_semantics, on='file_id')
 all_df = all_df.drop(columns='file_id')
-all_df.to_csv('./WRAP_spatio_semantic_features.csv', index=False)
+all_df.to_csv('./spatio_semantic_features.csv', index=False)
 
 plot_spatio_semantics(dir=results_dir)

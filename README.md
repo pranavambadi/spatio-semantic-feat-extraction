@@ -65,14 +65,14 @@ python -m spacy download en_core_web_sm
 ## Usage
 
 1. Place your transcript files in a directory (e.g., `./WRAP` for `.cha` files or `./transcripts` for `.rtf` files).
-2. Edit `extract_feat_ICASSP.py` to set `datasets` and `results_dir`.
+2. Edit `extract_feat.py` to set `datasets` and `results_dir`.
 3. Run:
 
 ```bash
-python extract_feat_ICASSP.py
+python extract_feat.py
 ```
 
-Output is written to `WRAP_spatio_semantic_features_ICASSP.csv`.
+Output is written to `spatio_semantic_features.csv`.
 
 ## Output Directory Structure
 
