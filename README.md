@@ -8,6 +8,16 @@ Each transcript is processed by matching spoken words against keyword lists for 
 
 This is the pipeline as described in the ICASSP 2023 paper.
 
+## Citation
+
+If you use this pipeline, please cite:
+
+```
+Ambadi PS, Basche K, Koscik RL, Berisha V, Liss JM and Mueller KD (2021) Spatio-Semantic Graphs From Picture Description: Applications to Detection of Cognitive Impairment. Front. Neurol. 12:795374. doi: 10.3389/fneur.2021.795374
+
+Ng, S. I., Ambadi, P. S., Mueller, K. D., Liss, J., & Berisha, V. (2025). Automated extraction of spatio-semantic graphs for identifying cognitive impairment. In Proc. ICASSP (pp. 1-5). IEEE.
+```
+
 ## Semantic Units
 
 | Category | Units |
