@@ -13,9 +13,9 @@ Each transcript is processed by matching spoken words against keyword lists for 
 If you use this pipeline, please cite:
 
 ```
-Ambadi PS, Basche K, Koscik RL, Berisha V, Liss JM and Mueller KD (2021) Spatio-Semantic Graphs From Picture Description: Applications to Detection of Cognitive Impairment. Front. Neurol. 12:795374. doi: 10.3389/fneur.2021.795374
+Ambadi, P. S., Basche, K., Koscik, R. L., Berisha, V., Liss, J. M., & Mueller, K. D. (2021). Spatio-Semantic Graphs From Picture Description: Applications to Detection of Cognitive Impairment. Frontiers in Neurology, 12. https://doi.org/10.3389/fneur.2021.795374
 
-Ng, S. I., Ambadi, P. S., Mueller, K. D., Liss, J., & Berisha, V. (2025). Automated extraction of spatio-semantic graphs for identifying cognitive impairment. In Proc. ICASSP (pp. 1-5). IEEE.
+Ng, S.-I., Ambadi, P. S., Mueller, K. D., Liss, J., & Berisha, V. (2025). Automated Extraction of Spatio-Semantic Graphs for Identifying Cognitive Impairment. ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP), 1–5. https://doi.org/10.1109/ICASSP49660.2025.10890726
 ```
 
 The ICASSP pipeline this repository extends is frozen at the [`icassp2025`](https://github.com/pranavambadi/spatio-semantic-feat-extraction/releases/tag/icassp2025) tag, and also lives standalone at [spatio-semantic-feat-extraction-icassp](https://github.com/pranavambadi/spatio-semantic-feat-extraction-icassp).
