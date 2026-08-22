@@ -18,7 +18,7 @@ Ambadi PS, Basche K, Koscik RL, Berisha V, Liss JM and Mueller KD (2021) Spatio-
 Ng, S. I., Ambadi, P. S., Mueller, K. D., Liss, J., & Berisha, V. (2025). Automated extraction of spatio-semantic graphs for identifying cognitive impairment. In Proc. ICASSP (pp. 1-5). IEEE.
 ```
 
-The ICASSP pipeline this repository extends is frozen at the [`icassp2025`](https://github.com/pranavambadi/spatio-semantic-feat-extraction-latest/releases/tag/icassp2025) tag, and also lives standalone at [spatio-semantic-feat-extraction-icassp](https://github.com/pranavambadi/spatio-semantic-feat-extraction-icassp).
+The ICASSP pipeline this repository extends is frozen at the [`icassp2025`](https://github.com/pranavambadi/spatio-semantic-feat-extraction/releases/tag/icassp2025) tag, and also lives standalone at [spatio-semantic-feat-extraction-icassp](https://github.com/pranavambadi/spatio-semantic-feat-extraction-icassp).
 
 ## Differences from the ICASSP Pipeline
 
