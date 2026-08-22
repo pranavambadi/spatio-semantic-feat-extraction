@@ -1,26 +1,32 @@
 """
 Extract spatio-semantic features from Cookie Theft picture description transcripts.
 
-Implements the feature extraction pipeline from:
-  Ambadi et al., "Spatio-Semantic Analysis of Picture Description for Dementia
-  Detection", ICASSP 2023.
+Extends the ICASSP 2023 pipeline with refined keyword matching and an automatic
+punctuation restoration step for RTF transcripts.
 
-Each transcript is mapped to 23 semantic units (subjects, places, objects, actions)
-from the Cookie Theft picture via keyword matching. Sequential transitions between
-units are modeled as a directed graph, from which path distance, node coverage,
-cycle, and quadrant-crossing features are computed.
+Differences from the ICASSP pipeline
+--------------------------------------
+- Sentence segmentation for RTF files uses a deep-learning punctuation restoration
+  model (deepmultilingualpunctuation) rather than treating the whole document as
+  one block. CHAT .cha files use *PAR: utterance boundaries as before.
+- Additional post-hoc keyword corrections applied to every sentence:
+    - 'cookie jar': counts jar (unit 7) only, not cookie (unit 6) separately.
+    - 'fall': unit 18 (boy/stool falling) retained only when preceded by boy or girl.
+    - 'reach': reassigned from girl-gesture (21) to boy-taking (17) when boy is present.
+    - Units 22/23: retained only when required co-occurring units are present.
+- Keyword list refined to reduce cross-unit overlap (e.g., 'plate'/'dish'/'floor').
 
 Supported transcript formats
 -----------------------------
 - CHAT (.cha): standard DementiaBank format; *PAR: utterances are parsed
   sentence-by-sentence.
-- Plain-text RTF (.rtf): entire document is treated as participant speech.
+- Plain-text RTF (.rtf): punctuation model segments speech into sentences.
 
 Usage
 -----
 1. Point `datasets` at your transcript directory.
-2. Point `results_dir` at a (writable) directory for intermediate .pkl files.
-3. Run:  python extract_feat.py
+2. Point `results_dir` at a (writable) output directory.
+3. Run:  python extract_feat_0509.py
 
 Output
 ------

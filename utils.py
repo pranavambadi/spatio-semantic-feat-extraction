@@ -1,3 +1,5 @@
+## citations: deepmultilingualpunctuation
+
 import regex as re
 import warnings, os, string
 from itertools import groupby
@@ -10,8 +12,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import distance
 from statistics import mean
 import math
-import spacy  # requires: python -m spacy download en_core_web_sm
-from striprtf.striprtf import rtf_to_text
+import spacy
 warnings.filterwarnings('ignore')
 
 # ── Cookie Theft picture description task — 23 semantic units ─────────────
@@ -49,6 +50,8 @@ nlp = spacy.load('en_core_web_sm')
 
 # Keyword lists for each of the 23 semantic units (index i → unit i+1).
 # Words are matched against lemmatized transcript tokens.
+# Note: "plate" removed from unit 15 (dishes) and "dish"/"floor" removed from
+# units 10/12 to avoid cross-unit overlap.
 keyword_list = [
     ["boy", "his", "he", "brother", "son", "child", "shirt", "shoe", "sock",
      "kid", "man", "himself", "adolescent", "male", "guy", "him", "child"],
@@ -67,14 +70,14 @@ keyword_list = [
      "bench", "furniture", "ladder", "perch", "step ladder", "step stool",
      "stepladder", "step-stool", "step-ladder"],
     ["basin", "drain", "sink", "sinks", "faucet"],
-    ["plate", "saucer", "dish"],
+    ["plate", "saucer"],                                    # "dish" removed — overlaps unit 15
     ["cloth", "dishcloth", "napkin", "rag", "textile", "towel", "dishtowel",
      "handtowel", "dishrag", "sponge"],
     ["deluge", "flood", "flow", "inundation", "liquid", "moisture", "torrent",
-     "water", "floor", "waters", "puddle"],
+     "water", "waters", "puddle"],                         # "floor" removed — spurious matches
     ["casement", "glass", "pane", "window"],
     ["cabinet", "cupboard", "shelf", "storage", "door", "handle"],
-    ["dish", "cup", "bowl", "plate"],
+    ["dish", "cup", "bowl"],                               # "plate" removed — overlaps unit 10
     ["curtain", "drape", "fabric", "textile", "window dressing", "wind",
      "hang", "wave", "tie", "tieback"],
     ["acquire", "snatch", "extract", "grab", "secure", "steal", "take",
@@ -82,20 +85,19 @@ keyword_list = [
     ["collapse", "collapsing", "fall", "tilt", "tip", "tipping", "topple",
      "toppling", "unstable", "overturn", "hurt", "backwards", "balance", "crash"],
     ["clean", "dry", "rinse", "scrub", "wash", "wipe", "washing"],
-    ["faucet", "deluge", "flood", "flow", "inundation", "overflow", "spill",
-     "splash", "torrent", "overflowing", "run", "pour", "overrun",
+    ["facuet,", "deluge", "flood", "flow", "inundation", "overflow", "spill",
+     "spillage", "splash", "torrent", "overflowing", "run", "pour", "overrun",
      "spilling", "drip", "overfill"],
     ["shh", "gesture", "motion", "reach", "signal", "laugh", "speak",
      "shout", "warn", "request", "ask", "finger", "mouth", "lips", "quiet",
      "say", "tell", "lip", "giggle", "point"],
     ["daze", "disregard", "ignorant", "neglectful", "nonchalant", "oblivious",
      "unconcerned", "notice", "aware", "unaware", "attention", "realize",
-     "concerned", "daydream", "distracted", "care", "stand", "ignore",
-     "concern", "distract"],
+     "concerned", "daydream", "distracted", "care", "ignore", "concern", "distract"],
     ["doesn't see", "apathetic", "attention", "distracted", "disregard",
      "focus", "ignorant", "indifferent", "nonchalant", "oblivious",
-     "unconcerned", "aware", "unaware", "back", "behind", "notice",
-     "unconcern", "distract", "ignore", "turn", "clue"]
+     "unconcerned", "aware", "unaware", "notice", "unconcern", "distract",
+     "ignore", "turn", "clue"]          # "back"/"behind" removed — too generic
 ]
 
 
@@ -120,18 +122,78 @@ def expand_repeats(input_text):
 
 
 def _clean(s):
-    """Strip CHAT-format annotations, time codes, and non-lexical tokens from a string."""
-    s = re.sub('\x15\d*_\d*\x15', ' ', s)   # remove time blocks \x15...\x15
-    s = re.sub('\[.*?\]', ' ', s)            # remove bracketed annotations
+    """Strip CHAT-format annotations, time codes, ellipses, and non-lexical tokens."""
+    s = s.replace('.', ' ')
+    s = re.sub('\x15\d*_\d*\x15', ' ', s)
+    s = re.sub('\[.*?\]', ' ', s)
     s = s.strip()
     s = re.sub('\t|\n|<|>', ' ', s)
     s = re.sub('\d+', '&=', s)
     s = re.sub('‡', '&=', s)
     s = re.sub('\&', '&=', s)
-    s = re.sub('xxx', '&=', s)              # xxx = unintelligible in CHAT
+    s = re.sub('xxx', '&=', s)
     tmp = re.sub('\&\=.*?\ ', ' ', s)
+    tmp = re.sub(r'…', ' ', tmp)
     tmp = remove_punctuation_translate(tmp)
     return tmp
+
+
+def extract_vec(text):
+    """Fit a TF-IDF vectorizer on a list of strings and return the feature matrix."""
+    vectorizer = TfidfVectorizer(max_features=5)
+    vectorizer.fit(text)
+    return vectorizer.transform(text).toarray()
+
+
+def hasNumbers(inputString):
+    """Return True if the string contains any digit character."""
+    return any(char.isdigit() for char in inputString)
+
+
+def remove_adjacent_duplicates(lst):
+    """Remove consecutive duplicate elements from a list."""
+    return [key for key, group in groupby(lst)]
+
+
+def match_keyword_and_count(transcript):
+    """Return a list of unit indices (1-based) for every keyword match in the transcript.
+
+    Iterates over each word in the (space-split) transcript and checks it against
+    all 23 keyword lists. The same unit index may appear multiple times if its
+    keywords occur multiple times.
+    """
+    global lookup, unit, nodes, keyword_list, mapping
+    count = []
+    for word in transcript.split(' '):
+        for x in range(len(keyword_list)):
+            if word in keyword_list[x]:
+                count.append(x + 1)
+    return count
+
+
+def process_ciu_reach(lst):
+    """Remap a unit-21 match to unit 17 when the boy (unit 1) preceded it.
+
+    When 'reach' is present and unit 1 (boy) appeared before unit 21 (girl
+    gesture) in the same sentence, the sequence is rewritten so that unit 21
+    becomes unit 17 (boy taking/stealing) and stray unit-2 (girl) entries after
+    the last unit-1 are dropped.
+    """
+    result = []
+    last_1_index = None
+    for num in lst:
+        if num == 1:
+            result.append(1)
+            last_1_index = len(result) - 1
+        elif num == 21:
+            if last_1_index is not None:
+                result = result[:last_1_index + 1] + [x for x in result[last_1_index + 1:] if x != 2]
+                result.append(17)
+            else:
+                result.append(21)
+        else:
+            result.append(num)
+    return result
 
 
 def extract_data(file_name, time=False):
@@ -156,6 +218,7 @@ def extract_data(file_name, time=False):
         Keys include file_id, file_dir, joined_all_par_speech (lemmatized),
         joined_all_par_speech_ori (raw), and for .cha files: mmse, sex, age.
     """
+    from striprtf.striprtf import rtf_to_text
     global nlp
 
     par = {}
@@ -250,68 +313,105 @@ def extract_data(file_name, time=False):
     return par
 
 
-def extract_vec(text):
-    """Fit a TF-IDF vectorizer on a list of strings and return the feature matrix."""
-    vectorizer = TfidfVectorizer(max_features=5)
-    vectorizer.fit(text)
-    return vectorizer.transform(text).toarray()
+def extract_spatio_semantics_asu(dir, txtfiles, results_dir='results'):
+    """Extract spatio-semantic features from plain-text RTF transcripts.
 
+    Uses a deep-learning punctuation restoration model to split each transcript
+    into pseudo-sentences, then matches each sentence against the 23 semantic unit
+    keyword lists. Applies post-hoc corrections for ambiguous keywords:
+      - 'cookie jar': counts jar (unit 7) but not cookie (unit 6)
+      - 'fall': unit 18 (boy/stool falling) only if immediately preceded by boy or girl
+      - 'reach': remapped via process_ciu_reach when boy is present
+      - units 22/23: only retained when required co-occurring units are present
+          unit 22 requires one of: sink (9), water overflowing (20), water (12)
+          unit 23 requires one of: boy (1), girl (2), cookie (6), stool (8), falling (18)
 
-def hasNumbers(inputString):
-    """Return True if the string contains any digit character."""
-    return any(char.isdigit() for char in inputString)
+    Saves a per-file pickle DataFrame to `results_dir/dataframes/`.
+    Returns a DataFrame with CIU_seq (list of unit-name sequences) and text columns.
 
-
-def remove_adjacent_duplicates(lst):
-    """Remove consecutive duplicate elements from a list."""
-    return [key for key, group in groupby(lst)]
-
-
-def match_keyword_and_count(transcript):
-    """Return a list of unit indices (1-based) for every keyword match in the transcript.
-
-    Iterates over each word in the (space-split) transcript and checks it against
-    all 23 keyword lists. The same unit index may appear multiple times if its
-    keywords occur multiple times.
+    Parameters
+    ----------
+    dir : str
+        Directory containing the RTF transcript files.
+    txtfiles : list of str
+        Filenames within `dir` to process.
+    results_dir : str
+        Root directory under which `dataframes/` will be created for output pickles.
     """
+    from deepmultilingualpunctuation import PunctuationModel
+    from striprtf.striprtf import rtf_to_text
+    model = PunctuationModel()
     global lookup, unit, nodes, keyword_list, mapping
 
-    count = []
-    for word in transcript.split(' '):
-        for x in range(len(keyword_list)):
-            if word in keyword_list[x]:
-                count.append(x + 1)
-    return count
+    dataframes_dir = os.path.join(results_dir, 'dataframes')
+    os.makedirs(dataframes_dir, exist_ok=True)
 
-
-def extract_spatio_semantics_manual(all_df, dir):
-    """Extract spatio-semantic features from manually annotated CHAT CIU files.
-
-    Reads CHAT .cha files containing manual CIU (Correct Information Unit)
-    annotations in the form '+ N' (e.g. '+ 7' for the jar unit). Maps each
-    annotated unit to its (x, y) pixel position on the Cookie Theft image.
-
-    Saves a per-file pickle DataFrame to `dir` and appends a CIU_seq column
-    (list of matched unit indices) to all_df.
-    """
-    global lookup, unit, nodes, keyword_list, mapping, nlp
+    all_df = pd.DataFrame(txtfiles)
     entirelist = []
-    pbar = tqdm(total=len(all_df.file_dir))
+    alltxt = []
+    pbar = tqdm(total=len(txtfiles))
 
-    for file, par_speech in zip(all_df.file_dir, all_df.joined_all_par_speech):
+    # Required co-occurring unit indices for units 22 and 23
+    required_22 = {9, 20, 12}
+    required_23 = {1, 2, 6, 8, 18}
+
+    for txt in txtfiles:
+        with open(os.path.join(dir, txt), 'r', errors='ignore') as f:
+            curr_speech = rtf_to_text(f.read())
+        curr_speech = curr_speech.lower()
+        if not curr_speech.endswith('.'):
+            curr_speech += '.'
+        alltxt.append(curr_speech)
+
         mylist = []
-        with open(file, encoding='utf-8') as text:
-            for line in text:
-                templist = re.findall(r"\+ \d{1,2}", line)
-                for x in np.arange(0, len(templist)):
-                    if type(templist[x]) != list and hasNumbers(templist[x]):
-                        mylist.append(int(templist[x][1:]))
+        entiretextlist = []
+
+        s = expand_repeats(curr_speech)
+        s = _clean(s)
+        s = re.sub(r'\s+', ' ', s).strip()
+
+        result = model.restore_punctuation(s)
+        for s in re.split(r'[.,]', result):
+            doc = nlp(s)
+            s = ' '.join([token.lemma_ for token in doc])
+
+            try:
+                templist = match_keyword_and_count(s)
+
+                # 'cookie jar' → count jar only, not cookie separately
+                if 'cookie jar' in s:
+                    templist = [x for i, x in enumerate(templist)
+                                if not (x == 6 and i + 1 < len(templist) and templist[i + 1] == 7)]
+
+                # 'fall' triggers unit 18 only when boy or girl preceded it
+                if 'fall' in s:
+                    templist = [
+                        x for i, x in enumerate(templist)
+                        if x != 18 or (i > 0 and templist[i - 1] in {1, 2})
+                    ]
+
+                if 'reach' in s and len(templist) > 1:
+                    templist = process_ciu_reach(templist)
+
+                templist = [i for n, i in enumerate(templist) if i not in templist[:n]]
+
+                if 22 in templist or 23 in templist:
+                    has_required_22 = any(x in required_22 for x in templist)
+                    has_required_23 = any(x in required_23 for x in templist)
+                    templist = [x for x in templist
+                                if (x != 22 or has_required_22) and (x != 23 or has_required_23)]
+
+                temptxtlist = [unit[i - 1] for i in templist]
+                entiretextlist.extend(temptxtlist)
+                mylist.extend(templist)
+            except:
+                print(f"Error processing utterance in {txt}")
 
         new_list, unit_list, unit_labels, reference, quadrant = [], [], [], [], []
-        entirelist.append(mylist)
+        entirelist.append(entiretextlist)
+
         if not mylist:
-            new_list = [(0, 0)]
-            unit_list = unit_labels = reference = quadrant = 'null'
+            new_list, unit_list, unit_labels, reference, quadrant = [(0, 0)], 'null', 'null', 'null', 'null'
         else:
             for x in mylist:
                 try:
@@ -319,64 +419,76 @@ def extract_spatio_semantics_manual(all_df, dir):
                     new_list.append(templook)
                     unit_list.append(unit[x - 1])
                     unit_labels.append(x)
-                    if x <= 3:
-                        reference.append('subject')
-                    elif 3 < x <= 5:
-                        reference.append('place')
-                    elif 5 < x <= 16:
-                        reference.append('object')
-                    else:
-                        reference.append('action')
-                    if templook[0] < 273 and templook[1] < 195:
-                        quadrant.append(1)
-                    elif templook[0] < 273 and templook[1] > 195:
-                        quadrant.append(2)
-                    elif templook[0] > 273 and templook[1] < 195:
-                        quadrant.append(3)
-                    elif templook[0] > 273 and templook[1] > 195:
-                        quadrant.append(4)
+                    reference.append(
+                        'subject' if x <= 3 else 'place' if 3 < x <= 5 else 'object' if 5 < x <= 16 else 'action')
+                    quadrant.append(
+                        1 if templook[0] < 273 and templook[1] < 195 else
+                        2 if templook[0] < 273 and templook[1] > 195 else
+                        3 if templook[0] > 273 and templook[1] < 195 else 4)
                 except:
-                    continue
+                    print("Fail to look up: {:d}".format(x))
+                    pass
 
         df = pd.DataFrame(new_list, columns=['x', 'y'])
         df['order'] = np.arange(len(df)) + 1
         df['unit'], df['unit #'], df['reference'], df['quadrant'] = unit_list, unit_labels, reference, quadrant
-        filename = os.path.splitext(os.path.basename(file))[0]
-        dataframes_dir = os.path.join(dir, 'dataframes')
-        os.makedirs(dataframes_dir, exist_ok=True)
+        filename = os.path.splitext(txt)[0]
         df.to_pickle(os.path.join(dataframes_dir, filename + '.pkl'))
         pbar.update(1)
 
     all_df['CIU_seq'] = entirelist
+    all_df['text'] = alltxt
     return all_df
 
 
 def extract_spatio_semantics(all_df, dir):
-    """Automatically extract spatio-semantic features from transcripts via keyword matching.
+    """Extract spatio-semantic features from transcripts via keyword matching.
 
-    For each transcript, lemmatizes the text, matches words against `keyword_list`
-    to identify which of the 23 semantic units are mentioned, and maps each matched
-    unit to its (x, y) pixel position on the Cookie Theft image.
+    Supports both CHAT-format .cha files (parses *PAR: utterances as sentences)
+    and plain-text .rtf files (uses a deep-learning punctuation restoration model
+    to recover sentence boundaries). Applies the same post-hoc keyword corrections
+    to both formats:
+      - 'cookie jar': counts jar (unit 7) only, not cookie (unit 6) separately.
+      - 'fall': unit 18 (boy/stool falling) only if preceded by boy or girl.
+      - 'reach': remapped via process_ciu_reach when boy is present.
+      - Units 22/23: retained only when required co-occurring units are present.
 
-    Supports both CHAT-format .cha files (parses *PAR: utterances sentence-by-sentence,
-    deduplicating keywords per sentence) and plain-text .rtf files (treats the whole
-    document as one block, deduplicating keywords globally).
-
-    Saves a per-file pickle DataFrame to `dir` and appends a CIU_seq column to all_df.
+    Saves a per-file pickle DataFrame to `dir/dataframes/` and appends a CIU_seq
+    column to all_df.
     """
+    from striprtf.striprtf import rtf_to_text
     global lookup, unit, nodes, keyword_list, mapping
+
+    dataframes_dir = os.path.join(dir, 'dataframes')
+    os.makedirs(dataframes_dir, exist_ok=True)
+
+    rtf_files = [f for f in all_df.file_dir if f.endswith('.rtf')]
+    if rtf_files:
+        from deepmultilingualpunctuation import PunctuationModel
+        model = PunctuationModel()
+    else:
+        model = None
+
+    required_22 = {9, 20, 12}
+    required_23 = {1, 2, 6, 8, 18}
+
     entirelist = []
     pbar = tqdm(total=len(all_df.file_dir))
 
-    for file, par_speech in zip(all_df.file_dir, all_df.joined_all_par_speech):
+    for file in all_df.file_dir:
         mylist = []
+
         if file.endswith('.rtf'):
             with open(file, 'r', errors='ignore') as f:
-                s = _clean(expand_repeats(rtf_to_text(f.read())))
-            s = ' '.join([token.lemma_ for token in nlp(s)])
-            templist = match_keyword_and_count(s)
-            mylist = [i for n, i in enumerate(templist) if i not in templist[:n]]
+                curr_speech = rtf_to_text(f.read()).lower()
+            if not curr_speech.endswith('.'):
+                curr_speech += '.'
+            s = expand_repeats(curr_speech)
+            s = _clean(s)
+            s = re.sub(r'\s+', ' ', s).strip()
+            sentences = re.split(r'[.,]', model.restore_punctuation(s))
         else:
+            sentences = []
             with open(file, encoding='utf-8', errors='ignore') as text:
                 curr_speech = ''
                 for line in text:
@@ -386,21 +498,44 @@ def extract_spatio_semantics(all_df, dir):
                         curr_speech += line
                     elif len(curr_speech) != 0 and (line.startswith('%') or line.startswith('*') or line.startswith('@')):
                         s = re.sub('\*PAR:\t', ' ', curr_speech)
-                        s = expand_repeats(s)
-                        s = _clean(s)
-                        s = ' '.join([token.lemma_ for token in nlp(s)])
-                        try:
-                            templist = match_keyword_and_count(s)
-                            templist = [i for n, i in enumerate(templist) if i not in templist[:n]]
-                            mylist.extend(templist)
-                        except:
-                            print(f"Error processing utterance in {file}")
+                        sentences.append(_clean(expand_repeats(s)))
                         curr_speech = ''
                     if ' '.join(str(line).split()) == '@G: Cat':
                         break
 
+        for s in sentences:
+            s = ' '.join([token.lemma_ for token in nlp(s)])
+            try:
+                templist = match_keyword_and_count(s)
+
+                if 'cookie jar' in s:
+                    templist = [x for i, x in enumerate(templist)
+                                if not (x == 6 and i + 1 < len(templist) and templist[i + 1] == 7)]
+
+                if 'fall' in s:
+                    templist = [
+                        x for i, x in enumerate(templist)
+                        if x != 18 or (i > 0 and templist[i - 1] in {1, 2})
+                    ]
+
+                if 'reach' in s and len(templist) > 1:
+                    templist = process_ciu_reach(templist)
+
+                templist = [i for n, i in enumerate(templist) if i not in templist[:n]]
+
+                if 22 in templist or 23 in templist:
+                    has_required_22 = any(x in required_22 for x in templist)
+                    has_required_23 = any(x in required_23 for x in templist)
+                    templist = [x for x in templist
+                                if (x != 22 or has_required_22) and (x != 23 or has_required_23)]
+
+                mylist.extend(templist)
+            except:
+                print(f"Error processing utterance in {file}")
+
         new_list, unit_list, unit_labels, reference, quadrant = [], [], [], [], []
         entirelist.append(mylist)
+
         if not mylist:
             new_list, unit_list, unit_labels, reference, quadrant = [(0, 0)], 'null', 'null', 'null', 'null'
         else:
@@ -424,8 +559,6 @@ def extract_spatio_semantics(all_df, dir):
         df['order'] = np.arange(len(df)) + 1
         df['unit'], df['unit #'], df['reference'], df['quadrant'] = unit_list, unit_labels, reference, quadrant
         filename = os.path.splitext(os.path.basename(file))[0]
-        dataframes_dir = os.path.join(dir, 'dataframes')
-        os.makedirs(dataframes_dir, exist_ok=True)
         df.to_pickle(os.path.join(dataframes_dir, filename + '.pkl'))
         pbar.update(1)
 
@@ -436,7 +569,7 @@ def extract_spatio_semantics(all_df, dir):
 def summarize_spatio_semantics(dir=None):
     """Compute graph-theoretic spatio-semantic features from per-file pickles.
 
-    Reads each .pkl saved by extract_spatio_semantics, constructs a directed
+    Reads each .pkl saved by extract_spatio_semantics_asu, constructs a directed
     multigraph where nodes are semantic units and edges are sequential transitions
     weighted by Euclidean distance between unit positions on the Cookie Theft image,
     and computes path, coverage, cycle, and quadrant features.
@@ -545,7 +678,7 @@ def summarize_spatio_semantics(dir=None):
 def plot_spatio_semantics(dir=None):
     """Plot the spatio-semantic transition graphs for each transcript in `dir`.
 
-    Reads each .pkl produced by extract_spatio_semantics and draws two directed
+    Reads each .pkl produced by extract_spatio_semantics_asu and draws two directed
     multigraphs per transcript: a unit-level graph (23 nodes) and a quadrant-level
     graph (4 nodes). Nodes are colored by quadrant (blue/green/red/yellow).
 
@@ -633,41 +766,3 @@ def plot_spatio_semantics(dir=None):
             plt.tight_layout()
             plt.savefig(os.path.join(quadrant_plots_dir, f'{name}.png'), bbox_inches='tight', dpi=150)
             plt.close()
-
-
-def extract_semantic_relevance(trans):
-    """Compute semantic relevance (SemR) for each transcript in a DataFrame.
-
-    For each row in `trans`, counts how many of the 23 semantic units are mentioned
-    (binary per unit) in the lemmatized transcript and divides by total word count.
-
-    Adds columns: word_count_manual, word_count_auto, CIU_manual, SemR_manual.
-    Requires joined_all_par_speech_ori (raw) and joined_all_par_speech (lemmatized).
-    """
-    global lookup, unit, nodes, keyword_list, mapping
-
-    def remove_redundant_spaces(text):
-        return ' '.join(text.split())
-
-    def match_keyword(keyword_list, transcript):
-        return any(word in transcript for word in keyword_list)
-
-    for i in range(len(trans)):
-        f = trans.loc[i, "joined_all_par_speech_ori"]
-        f = remove_redundant_spaces(f)
-        word_count_ori = len(f.split())
-        trans.loc[i, "word_count_manual"] = word_count_ori
-
-        ff = trans.loc[i, "joined_all_par_speech"]
-        ff = remove_redundant_spaces(ff)
-        word_count_auto = len(ff.split())
-        trans.loc[i, "word_count_auto"] = word_count_auto
-
-        counter = np.zeros(23)
-        for j in range(23):
-            counter[j] = match_keyword(keyword_list[j], ff)
-
-        trans.loc[i, "CIU_manual"] = sum(counter)
-        trans.loc[i, "SemR_manual"] = sum(counter) / word_count_ori
-
-    return trans

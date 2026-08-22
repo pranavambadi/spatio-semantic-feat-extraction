@@ -1,12 +1,12 @@
-# Spatio-Semantic Feature Extraction from Cookie Theft Descriptions
+# Spatio-Semantic Feature Extraction from Cookie Theft Descriptions (Refined Pipeline)
 
 Extracts graph-theoretic spatio-semantic features from picture description transcripts of the Cookie Theft stimulus (Boston Diagnostic Aphasia Examination). Used for dementia detection research.
+
+This is an updated version of the ICASSP 2023 pipeline with a refined keyword list, post-hoc keyword corrections, and automatic punctuation restoration for RTF transcripts.
 
 ## Overview
 
 Each transcript is processed by matching spoken words against keyword lists for 23 predefined semantic units in the Cookie Theft image. Matched units are mapped to their pixel coordinates in the image, forming a directed multigraph of sequential unit transitions. Graph-theoretic features computed from this graph serve as the feature set.
-
-This is the pipeline as described in the ICASSP 2023 paper.
 
 ## Citation
 
@@ -17,6 +17,28 @@ Ambadi PS, Basche K, Koscik RL, Berisha V, Liss JM and Mueller KD (2021) Spatio-
 
 Ng, S. I., Ambadi, P. S., Mueller, K. D., Liss, J., & Berisha, V. (2025). Automated extraction of spatio-semantic graphs for identifying cognitive impairment. In Proc. ICASSP (pp. 1-5). IEEE.
 ```
+
+The ICASSP pipeline this repository extends is frozen at the [`icassp2025`](https://github.com/pranavambadi/spatio-semantic-feat-extraction-latest/releases/tag/icassp2025) tag, and also lives standalone at [spatio-semantic-feat-extraction-icassp](https://github.com/pranavambadi/spatio-semantic-feat-extraction-icassp).
+
+## Differences from the ICASSP Pipeline
+
+**Sentence segmentation for RTF files** uses a deep-learning punctuation restoration model (`deepmultilingualpunctuation`) rather than treating the whole document as one block. CHAT `.cha` files continue to use `*PAR:` utterance boundaries.
+
+**Post-hoc keyword corrections** applied to every sentence:
+
+| Correction | Rule |
+|---|---|
+| `cookie jar` | Counts jar (unit 7) only; drops the spurious cookie (unit 6) match |
+| `fall` | Unit 18 (boy/stool falling) retained only when immediately preceded by boy or girl |
+| `reach` | Reassigned from girl-gesture (unit 21) to boy-taking (unit 17) when boy is present |
+| Units 22/23 | Unit 22 retained only with sink/water/overflow present; unit 23 only with boy/girl/cookie/stool/falling present |
+
+**Refined keyword list** reduces cross-unit overlap:
+- `"dish"` removed from unit 10 (plate) — overlaps unit 15 (dishes)
+- `"floor"` removed from unit 12 (water) — causes spurious matches
+- `"plate"` removed from unit 15 (dishes) — overlaps unit 10 (plate)
+- `"spillage"` added to unit 20 (water overflowing)
+- `"back"` / `"behind"` removed from unit 23 — too generic
 
 ## Semantic Units
 
@@ -50,7 +72,9 @@ For CHAT `.cha` files, participant metadata is also extracted: `mmse`, `sex`, `a
 ## Supported Transcript Formats
 
 - **CHAT `.cha`** (DementiaBank format): `*PAR:` utterances are parsed sentence-by-sentence; participant metadata is read from the `@ID` header.
-- **Plain-text `.rtf`**: RTF markup is stripped via `striprtf`; the entire document is treated as one block.
+- **Plain-text `.rtf`**: RTF markup is stripped via `striprtf`; sentence boundaries are restored by `deepmultilingualpunctuation` before keyword matching.
+
+Both formats can be mixed in the same run.
 
 ## Requirements
 
@@ -65,6 +89,7 @@ matplotlib
 scipy
 spacy
 striprtf
+deepmultilingualpunctuation  # only required when processing .rtf files
 ```
 
 Install spaCy's English model:
